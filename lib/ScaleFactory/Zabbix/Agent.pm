@@ -7,19 +7,44 @@ use base qw( Net::Server::PreForkSimple );
 
 use Log::Log4perl;
 use Error qw(:try);
-use Data::Dumper;
+use Params::Validate qw(validate CODEREF SCALAR);
 
 use ScaleFactory::Zabbix::Protocol::Packet;
 use ScaleFactory::Zabbix::Error;
 use ScaleFactory::Zabbix::Error::TimeOut;
 
 
-my $actions = {
+my $actions = {};
 
-    version => sub { return 'ZabbixServer 0.01'; },
-    echo    => sub { return 'Echoing: ' . join( ',', map { "'$_'" } @_ ) },
+sub register_handler {
 
-};
+    my $log = Log::Log4perl->get_logger( __PACKAGE__ );
+    $log->trace( __PACKAGE__ . '->register_handler' );
+
+    my $self = shift;
+
+    my %args = validate( @_, {
+
+        'parameter' => {
+            type => SCALAR,
+        },
+
+        'sub' => {
+            type => CODEREF,
+        },
+
+    } );
+
+    if( exists( $actions->{ $args{ parameter } } ) ) {
+        my $error = "Parameter '".$args{ parameter }."' already registered";
+        $log->error( $error );
+        throw ScaleFactory::Zabbix::Error( $error );
+    }
+
+    $log->info( "Registering handler for '".$args{ parameter }."'" );
+    $actions->{ $args{ parameter } } = $args{ 'sub' };
+
+}
 
 sub process_request {
 
